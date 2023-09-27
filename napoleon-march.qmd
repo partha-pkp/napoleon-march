@@ -1,0 +1,176 @@
+---
+title: "Visualizing the Napoleon's march"
+author: "Partha Koundinya Panguluri"
+
+toc: true
+toc-title: On this page
+code-fold: true
+code-summary: "Show the code"
+format:
+  html:
+    theme: united
+    title-block-banner: true
+    backgroundcolor: "#fcfcfc"
+    embed-resources: true
+---
+
+
+Following resources were referred to understand Napoleon's march in ggplot2.\
+[Minard meets ggplot2](http://euclid.psych.yorku.ca/www/psy6135/tutorials/Minard.html)\
+[Exploring Minard's 1812 plot with ggplot2](https://www.andrewheiss.com/blog/2017/08/10/exploring-minards-1812-plot-with-ggplot2/)\
+\
+\
+```{r}
+#| echo: false
+options(repos = c(CRAN = "http://cran.rstudio.com"))
+```
+
+
+# Part I - The Locations
+
+## Setting off - Plot based on the geographical locations
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+
+# Installing the libraries necessary
+
+if(!require(pacman))
+    install.packages("pacman")
+pacman::p_load(gridExtra, scales, ggplot2, grid, dplyr)
+
+
+# Importing the data
+napoleon <- readRDS("data/napoleon.rds")
+str(napoleon$troops)
+str(napoleon$cities)
+str(napoleon$temperatures)
+
+
+
+#plotting a graph for napoleon_troops dataset with long and lat at x,y axes
+ggplot(napoleon$troops, aes(long, lat)) +
+  geom_path(aes(line_width = survivors))
+```
+
+The initial Napolean's March plot was difficult to understand. So, it was plotted with colors.\
+Further modifications were made to improve the readability.\
+Then, parameters like places, temperature were included to provide more insights about the event.
+
+## Embedding aesthetics
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+
+#  Plotting previous graph in different colours based on the path of troops
+ggplot(napoleon$troops, aes(long, lat)) +
+  geom_path(aes(size = survivors, colour = direction, group = group)) +
+  coord_fixed()  #fixing coordinates based on aspect ratio
+```
+
+## Adjusting the scales
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+#adjusting the scales to fit data into the graph
+breaks <- c(1, 2, 3) * 10^5  #fixing the x-axis readability
+ggplot(napoleon$troops, aes(long, lat)) +
+  geom_path(aes(size = survivors, colour = direction, group = group), lineend = "round") +
+  scale_size("Survivors", range = c(1,10), breaks = breaks, labels = scales::comma(breaks))+
+  scale_color_hue("Direction", labels = c("Advance", "Retreat"))
+
+#storing our plotted graph for troops
+graph_troops <- last_plot()
+
+```
+
+## Plotting city locations
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+#adding the cities along path of troops
+graph_troops + geom_text(data = napoleon$cities, aes(label = city), size = 4)
+
+#adding the cities to be adjusted into the graph as points
+graph_troops + geom_point(data = napoleon$cities) +
+  geom_text(data = napoleon$cities, aes(label = city), vjust = 1.5, family = "Times New Roman" )
+```
+
+## Avoiding any overlaps among points and city labels
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+#using the ggrepel function to plot overlapping points/ path separately
+install.packages("ggrepel")
+library(ggplot2)
+library(ggrepel)
+graph_troops + geom_point(data = napoleon$cities) +
+  geom_text_repel(data = napoleon$cities, aes(label = city))
+
+#saving the plot with data from troops and cities dataset from the napoleon dataset 
+graph_troops_cities <- last_plot()
+
+```
+
+# Part II - Temperature plots
+
+## Presenting basic temperature plot
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+#reading the temperature dataset to understand the data
+napoleon$temperatures
+
+#plotting line plot for temperature
+ggplot(napoleon$temperatures, aes(long, temp)) +
+  geom_path(color = "black", size = 1.5) +
+  geom_point(size = 2)
+```
+
+## Inserting values
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+#creating a label to show the temperature at different points on the graph
+library(dplyr)
+napoleon_temp <- napoleon$temperatures %>%
+  mutate(format_degrees = paste0(temp, "° ", date))
+head(napoleon_temp$format_degrees)
+
+#plotting the graph with this label and format for temperature
+ggplot(napoleon_temp, aes(long, temp)) +
+  geom_path(color = "grey", size = 1.5) +
+  geom_point(size = 1) +
+  geom_text_repel(aes(label = format_degrees), size=2.5)
+
+#saving the graph for temperature across different dates
+graph_temp <- last_plot()
+
+```
+
+# Part I + Part II - The Assembly
+
+```{r, echo=TRUE, message = FALSE, results='hide', warning=FALSE, fig.width=10,fig.height=3.5}
+#compiling all the graphs together
+library(gridExtra)
+grid.arrange(graph_troops_cities, graph_temp)
+
+#removing the labels for plotted figure for movement of troops and cities to match it with our temperature plot
+library(ggplot2)
+graph_troops_cities + coord_cartesian(xlim = c(24, 38)) +
+  labs(x = NULL, y = NULL) + guides(color = FALSE, size = FALSE) +
+  theme_void()
+
+graph_troops_cities_edited <- last_plot()
+
+#performing similar edits on the temperature graph and adjusting it
+graph_temp + 
+  coord_cartesian(xlim = c(24, 38)) +
+  labs(x = NULL, y = "Temperature") +
+  theme_bw() +
+  theme(panel.grid.major.x = element_blank(), panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(), axis.text.x = element_blank(), axis.ticks = element_blank(),
+        panel.border = element_blank())
+
+graph_temp_edited <- last_plot()
+
+#compiling our edited graphs together
+library(grid)
+library(gridExtra)
+grid.arrange(graph_troops_cities_edited, graph_temp_edited, nrow=2, heights=c(3.5, 1.2))
+grid.rect(width = .99, height = .99, gp = gpar(lwd = 2, col = "gray", fill = NA))
+
+```
